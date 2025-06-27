@@ -500,7 +500,7 @@
             <h1>🎨 艺术机构动态监控器</h1>
             <p>自动追踪你关注的艺术机构最新动态，无需逐一查看</p>
             <div style="background: rgba(255, 255, 255, 0.1); border-radius: 10px; padding: 10px; margin-top: 15px; font-size: 14px;">
-                💡 <strong>演示版本</strong>：在 Claude.ai 环境中运行，数据仅在当前会话保存，刷新页面后重置
+                💡 <strong>手动RSS版本</strong>：无外部依赖，支持手动导入RSS内容获取真实数据
             </div>
         </div>
 
@@ -721,6 +721,26 @@
     </div>
 
     <script>
+        // 安全地更新元素内容
+        function safeSetInnerHTML(elementId, content) {
+            const element = document.getElementById(elementId);
+            if (element) {
+                element.innerHTML = content;
+            } else {
+                console.warn(`元素不存在: ${elementId}`);
+            }
+        }
+
+        // 安全地更新元素文本
+        function safeSetTextContent(elementId, content) {
+            const element = document.getElementById(elementId);
+            if (element) {
+                element.textContent = content;
+            } else {
+                console.warn(`元素不存在: ${elementId}`);
+            }
+        }
+
         // 存储数据（使用内存存储，适配 Claude.ai artifacts 环境）
         let institutions = [];
         let updates = [];
@@ -729,8 +749,33 @@
         // 初始化
         document.addEventListener('DOMContentLoaded', function() {
             try {
-                console.log('开始初始化...');
+                console.log('🚀 开始初始化应用...');
                 
+                // 检查关键元素是否存在
+                const requiredElements = [
+                    'institutionsList', 'updatesFeed', 'todayUpdates', 
+                    'totalUpdates', 'activeInstitutions', 'monitoringCount',
+                    'rssInstitutionSelect', 'rssContent'  // RSS相关元素
+                ];
+                
+                console.log('🔍 检查必需元素...');
+                const missingElements = requiredElements.filter(id => {
+                    const element = document.getElementById(id);
+                    if (!element) {
+                        console.error(`❌ 缺少元素: ${id}`);
+                        return true;
+                    }
+                    console.log(`✅ 找到元素: ${id}`);
+                    return false;
+                });
+                
+                if (missingElements.length > 0) {
+                    console.error('💥 缺少以下关键元素:', missingElements);
+                    showNotification(`❌ 页面元素缺失: ${missingElements.join(', ')}`);
+                    // 继续执行，但会有功能受限
+                }
+                
+                console.log('📊 渲染初始数据...');
                 renderInstitutions();
                 renderUpdates();
                 updateStats();
@@ -739,13 +784,17 @@
                 
                 // 如果没有机构，显示设置页面
                 if (institutions.length === 0) {
-                    console.log('没有机构，切换到设置页面');
+                    console.log('🔧 没有机构，切换到设置页面');
                     switchPage('settings');
+                } else {
+                    console.log('🏠 保持在主页');
                 }
                 
-                console.log('初始化完成');
+                console.log('🎉 初始化完成！');
+                showNotification('✅ 应用初始化成功');
+                
             } catch (error) {
-                console.error('初始化时出错:', error);
+                console.error('💥 初始化时出错:', error);
                 showNotification('❌ 初始化失败: ' + error.message);
             }
         });
@@ -848,7 +897,13 @@
 
         // 渲染机构列表
         function renderInstitutions() {
+            console.log('🏛️ 开始渲染机构列表, 机构数量:', institutions.length);
+            
             const container = document.getElementById('institutionsList');
+            if (!container) {
+                console.error('❌ institutionsList 元素不存在');
+                return;
+            }
             
             if (institutions.length === 0) {
                 container.innerHTML = `
@@ -858,6 +913,7 @@
                         <button class="btn" onclick="switchPage('settings')">立即添加</button>
                     </div>
                 `;
+                console.log('📝 显示空状态');
                 return;
             }
             
@@ -866,7 +922,10 @@
                     <h4>${institution.name}</h4>
                     <p>🌐 ${institution.url}</p>
                     <p>🏷️ 关键词：${institution.keywords || '无'}</p>
-                    <p>📡 RSS数据：${institution.hasRssData ? 
+                    <p>📡 RSS链接：${institution.rssUrl ? 
+                        `<span style="color: #38a169;">✅ 已配置</span>` : 
+                        `<span style="color: #f56565;">❌ 未配置</span>`}</p>
+                    <p>📊 RSS数据：${institution.hasRssData ? 
                         `<span style="color: #38a169;">✅ 已导入真实数据</span>` : 
                         `<span style="color: #f56565;">❌ 未导入（仅模拟数据）</span>`}</p>
                     <p>⏰ 检查频率：每${institution.frequency}分钟</p>
@@ -879,17 +938,27 @@
                     </div>
                 </div>
             `).join('');
+            
+            console.log('✅ 机构列表渲染完成');
         }
 
         // 渲染更新动态
         function renderUpdates() {
+            console.log('📰 开始渲染更新动态, 总动态数:', updates.length, '当前过滤器:', currentFilter);
+            
             const container = document.getElementById('updatesFeed');
+            if (!container) {
+                console.error('❌ updatesFeed 元素不存在');
+                return;
+            }
             
             // 根据过滤器筛选
             let filteredUpdates = updates;
             if (currentFilter !== 'all') {
                 filteredUpdates = updates.filter(update => update.type === currentFilter);
             }
+            
+            console.log('📊 过滤后动态数:', filteredUpdates.length);
             
             if (filteredUpdates.length === 0) {
                 const emptyMessage = currentFilter === 'all' 
@@ -903,6 +972,7 @@
                         ${institutions.length === 0 ? '<button class="btn" onclick="switchPage(\'settings\')">添加机构开始监控</button>' : ''}
                     </div>
                 `;
+                console.log('📝 显示空状态');
                 return;
             }
             
@@ -927,6 +997,8 @@
                     </div>
                 </div>
             `).join('');
+            
+            console.log('✅ 动态列表渲染完成');
         }
 
         // 获取类型图标
@@ -958,10 +1030,10 @@
                 new Date(update.timestamp).toDateString() === today
             ).length;
             
-            document.getElementById('todayUpdates').textContent = todayUpdates;
-            document.getElementById('totalUpdates').textContent = updates.length;
-            document.getElementById('activeInstitutions').textContent = institutions.length;
-            document.getElementById('monitoringCount').textContent = `监控 ${institutions.length} 个机构`;
+            safeSetTextContent('todayUpdates', todayUpdates);
+            safeSetTextContent('totalUpdates', updates.length);
+            safeSetTextContent('activeInstitutions', institutions.length);
+            safeSetTextContent('monitoringCount', `监控 ${institutions.length} 个机构`);
         }
 
         // 删除机构
@@ -1034,6 +1106,11 @@
         // 更新RSS机构选择下拉框
         function updateRssInstitutionSelect() {
             const select = document.getElementById('rssInstitutionSelect');
+            if (!select) {
+                console.warn('RSS选择框元素不存在');
+                return;
+            }
+            
             if (institutions.length === 0) {
                 select.innerHTML = '<option value="">请先添加机构</option>';
                 return;
@@ -1047,8 +1124,27 @@
 
         // 解析RSS内容
         function parseRssContent() {
-            const institutionId = document.getElementById('rssInstitutionSelect').value;
-            const rssContent = document.getElementById('rssContent').value.trim();
+            console.log('📥 开始解析RSS内容...');
+            
+            const institutionSelect = document.getElementById('rssInstitutionSelect');
+            const rssTextarea = document.getElementById('rssContent');
+            
+            if (!institutionSelect) {
+                console.error('❌ rssInstitutionSelect 元素不存在');
+                showNotification('❌ RSS选择框不存在');
+                return;
+            }
+            
+            if (!rssTextarea) {
+                console.error('❌ rssContent 元素不存在');
+                showNotification('❌ RSS内容框不存在');
+                return;
+            }
+            
+            const institutionId = institutionSelect.value;
+            const rssContent = rssTextarea.value.trim();
+            
+            console.log('📝 获取数据:', { institutionId, rssContentLength: rssContent.length });
             
             if (!institutionId) {
                 showNotification('❌ 请选择机构');
@@ -1062,12 +1158,14 @@
             
             const institution = institutions.find(inst => inst.id == institutionId);
             if (!institution) {
+                console.error('❌ 找不到机构:', institutionId);
                 showNotification('❌ 机构不存在');
                 return;
             }
             
             try {
                 showNotification('🔄 正在解析RSS内容...');
+                console.log('🔍 开始XML解析...');
                 
                 // 使用DOMParser解析XML
                 const parser = new DOMParser();
@@ -1086,6 +1184,8 @@
                 if (items.length === 0) {
                     items = xmlDoc.querySelectorAll('entry');
                 }
+                
+                console.log(`📊 找到 ${items.length} 个RSS条目`);
                 
                 if (items.length === 0) {
                     throw new Error('未找到RSS条目，请检查XML格式');
@@ -1112,7 +1212,10 @@
                     }
                     if (!pubDate) pubDate = getElementText(item, 'published') || getElementText(item, 'updated');
                     
-                    if (!title) continue; // 跳过没有标题的条目
+                    if (!title) {
+                        console.warn(`⚠️ 跳过无标题条目 ${i}`);
+                        continue;
+                    }
                     
                     // 检查是否已存在
                     const exists = updates.some(update => 
@@ -1132,6 +1235,9 @@
                         };
                         updates.unshift(newUpdate);
                         addedCount++;
+                        console.log(`✅ 添加RSS条目: ${title}`);
+                    } else {
+                        console.log(`⚠️ 跳过重复条目: ${title}`);
                     }
                 }
                 
@@ -1139,18 +1245,20 @@
                 institution.hasRssData = true;
                 institution.lastChecked = new Date().toISOString();
                 
+                console.log(`📊 成功解析，新增 ${addedCount} 条内容`);
+                
                 renderUpdates();
                 updateStats();
                 renderInstitutions();
                 
                 // 清空文本框
-                document.getElementById('rssContent').value = '';
-                document.getElementById('rssInstitutionSelect').value = '';
+                rssTextarea.value = '';
+                institutionSelect.value = '';
                 
                 showNotification(`✅ 成功解析并导入 ${addedCount} 条真实RSS内容！`);
                 
             } catch (error) {
-                console.error('RSS解析错误:', error);
+                console.error('💥 RSS解析错误:', error);
                 showNotification(`❌ RSS解析失败: ${error.message}`);
             }
         }
@@ -1258,6 +1366,46 @@
             return text.substring(0, 200) + (text.length > 200 ? '...' : '');
         }
 
+        // 显示示例RSS格式
+        function showSampleRss() {
+            console.log('📋 显示示例RSS格式');
+            
+            const rssTextarea = document.getElementById('rssContent');
+            if (!rssTextarea) {
+                console.error('❌ rssContent 元素不存在');
+                showNotification('❌ RSS内容框不存在');
+                return;
+            }
+            
+            const sampleRss = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>艺术机构新闻</title>
+    <description>最新艺术展览和活动</description>
+    <link>https://example-museum.org</link>
+    
+    <item>
+      <title>新展览：当代艺术精品展</title>
+      <description>本展览将展出20世纪至今的当代艺术精品，包括绘画、雕塑、装置艺术等多种形式。</description>
+      <link>https://example-museum.org/exhibitions/contemporary-art</link>
+      <pubDate>Wed, 26 Jun 2025 10:00:00 GMT</pubDate>
+    </item>
+    
+    <item>
+      <title>学术讲座：艺术与科技的融合</title>
+      <description>邀请知名艺术家和学者探讨数字化时代艺术创作的新可能性。</description>
+      <link>https://example-museum.org/events/art-tech-lecture</link>
+      <pubDate>Tue, 25 Jun 2025 14:30:00 GMT</pubDate>
+    </item>
+    
+  </channel>
+</rss>`;
+            
+            rssTextarea.value = sampleRss;
+            console.log('✅ 示例RSS已填入');
+            showNotification('📋 已填入示例RSS格式，你可以替换为真实的RSS内容');
+        }
+
         function editInstitution(id) {
             showNotification('✏️ 编辑功能开发中...');
         }
@@ -1281,7 +1429,7 @@
 
         // 更新最后更新时间
         function updateLastUpdateTime() {
-            document.getElementById('lastUpdate').textContent = `最后更新：${new Date().toLocaleTimeString()}`;
+            safeSetTextContent('lastUpdate', `最后更新：${new Date().toLocaleTimeString()}`);
         }
 
         // 格式化时间
@@ -1357,31 +1505,7 @@
             showNotification('📤 数据导出完成');
         }
 
-        // 测试 RSS 连接（在 Claude.ai artifacts 中为模拟测试）
-        async function testRss(id) {
-            const institution = institutions.find(inst => inst.id === id);
-            if (!institution) return;
-            
-            const rssUrl = inferRssUrl(institution.url, institution);
-            if (!rssUrl) {
-                showNotification(`❌ ${institution.name} 未找到 RSS 地址`);
-                return;
-            }
-            
-            showNotification(`🔍 正在测试 ${institution.name} 的 RSS 连接...`);
-            
-            // 在 Claude.ai artifacts 环境中模拟 RSS 测试
-            await new Promise(resolve => setTimeout(resolve, 1500));
-            
-            // 模拟测试结果
-            const testResult = Math.random() > 0.3; // 70% 成功率
-            
-            if (testResult) {
-                showNotification(`✅ ${institution.name} RSS 连接正常（模拟测试）`);
-            } else {
-                showNotification(`⚠️ ${institution.name} RSS 连接异常（模拟测试）`);
-            }
-        }
+
 
         function editInstitution(id) {
             showNotification('✏️ 编辑功能开发中...');
